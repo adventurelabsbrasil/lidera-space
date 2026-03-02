@@ -1,12 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
-
-function AdminView() {
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold">Visão Admin</h1>
-    </div>
-  )
-}
+import { getPrograms } from '@/app/actions/admin'
+import { AdminView } from '@/components/dashboard/admin-view'
 
 function StudentView() {
   return (
@@ -36,7 +30,8 @@ export default async function DashboardPage() {
   const role = profile?.role ?? 'aluno'
 
   if (role === 'admin') {
-    return <AdminView />
+    const programs = await getPrograms()
+    return <AdminView programs={programs} />
   }
 
   return <StudentView />
