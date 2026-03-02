@@ -1,0 +1,11 @@
+# Adventure Labs - Regras Globais (Lidera Space)
+
+## Stack Tecnológica
+- **Frontend:** Next.js 14+ (App Router), React, Tailwind CSS, shadcn/ui.
+- **Backend/Auth/DB:** Supabase (pacote `@supabase/ssr`), PostgreSQL.
+
+## Regras de Código
+1. TUDO no Next.js deve ser Server Component por padrão. Use `"use client"` APENAS em componentes interativos dentro da pasta `/components`.
+2. NUNCA faça chamadas diretas ao banco no Client-side. Toda mutação de dados deve usar Next.js Server Actions na pasta `app/actions/`.
+3. Use Tailwind CSS para estilização e instale componentes via CLI do shadcn (ex: `npx shadcn-ui@latest add button`).
+4. Nenhuma tabela no Supabase deve existir sem Row Level Security (RLS) ativada.
