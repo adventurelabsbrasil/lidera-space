@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useActionState, useEffect, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { Plus } from 'lucide-react'
@@ -74,7 +75,14 @@ export function AdminView({ programs }: AdminViewProps) {
             ) : (
               programs.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium">{p.title}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/dashboard/programs/${p.id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {p.title}
+                    </Link>
+                  </TableCell>
                   <TableCell className="max-w-[300px] truncate hidden md:table-cell">
                     {p.description ?? '—'}
                   </TableCell>
