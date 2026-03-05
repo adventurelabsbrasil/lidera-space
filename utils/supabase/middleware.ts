@@ -30,5 +30,15 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  return { response, user }
+  let role = 'aluno'
+  if (user) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile) role = profile.role
+  }
+
+  return { response, user, role }
 }
