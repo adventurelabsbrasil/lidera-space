@@ -90,6 +90,15 @@ Tabelas definidas em `supabase/migrations/20260301195140_init_schema.sql`, com:
 
 ---
 
+## Visões do dashboard (admin x aluno)
+
+- **Gestão de Programas** — Aparece quando o usuário tem `role = 'admin'` em `public.users`. Mostra tabela de programas, botão "Novo Programa" e links para módulos/aulas. Dados vêm de `getPrograms()`.
+- **Meus Programas** — Aparece quando o usuário tem `role = 'aluno'` (ou qualquer outro valor). Mostra cards dos programas disponíveis e links para `/dashboard/courses/[id]`. Dados vêm de `listStudentPrograms()`.
+
+Se uma conta que deveria ter acesso total vê "Meus Programas" vazio, verifique: (1) se `public.users.role = 'admin'` para esse usuário (ver passo 4 acima); (2) se o seed mínimo de conteúdo foi executado (passo 5); (3) se a migration de RLS `20260304120000_rls_authenticated_read.sql` foi aplicada, para leitura de programas por usuários autenticados.
+
+---
+
 ## Como Rodar Localmente
 
 Pré‑requisitos:
@@ -108,48 +117,22 @@ Pré‑requisitos:
    ```
 
 3. Garantir schema e RLS:
-   - Execute a migration em `supabase/migrations/20260301195140_init_schema.sql` no projeto Supabase correspondente.
+   - Execute as migrations em `supabase/migrations/` no projeto Supabase (na ordem: `20260301195140_init_schema.sql`, depois `20260304120000_rls_authenticated_read.sql`), ou use `supabase db push` se estiver usando Supabase CLI.
 
-4. Criar usuários iniciais:
-   - Crie usuários em `auth.users` pelo painel do Supabase (Authentication → Users).
-   - Garanta que `public.users` tenha pelo menos:
-     - Um admin:
-       ```sql
-       insert into public.users (id, email, role)
-       values ('ID_DO_AUTH_ADMIN', 'admin@seu-dominio.com', 'admin')
-       on conflict (id) do update set role = 'admin';
-       ```
-     - (Opcional) um aluno:
-       ```sql
-       insert into public.users (id, email, role)
-       values ('ID_DO_AUTH_ALUNO', 'aluno@seu-dominio.com', 'aluno')
-       on conflict (id) do update set role = 'aluno';
-       ```
+4. Criar usuários iniciais e definir admin (conta com acesso total):
+   - Crie usuários em `auth.users` pelo painel do Supabase (Authentication → Users). O trigger já insere em `public.users` com `role = 'aluno'`.
+   - Para dar **acesso total** (painel de gestão de programas), promova um usuário a admin:
+     - **Opção A — seed por e-mail:** Edite `supabase/seeds/seed_admin.sql`, substitua `admin@seu-dominio.com` pelo e-mail desejado e execute no SQL Editor ou:  
+       `supabase db execute --file supabase/seeds/seed_admin.sql`
+     - **Opção B — manual por ID:**  
+       `UPDATE public.users SET role = 'admin' WHERE id = 'UUID_DO_USUARIO';`  
+       ou por e-mail:  
+       `UPDATE public.users SET role = 'admin' WHERE email = 'admin@seu-dominio.com';`
 
-5. Seed mínimo de conteúdo (opcional, para testes rápidos):
-   ```sql
-   insert into public.programs (id, title, description) values (
-     '00000000-0000-0000-0000-000000000001',
-     'Programa de Liderança',
-     'Formação em liderança para gestores de escola.'
-   ) on conflict (id) do nothing;
-
-   insert into public.modules (id, program_id, title, "order") values (
-     '00000000-0000-0000-0000-000000000002',
-     '00000000-0000-0000-0000-000000000001',
-     'Módulo 1 - Fundamentos',
-     1
-   ) on conflict (id) do nothing;
-
-   insert into public.lessons (id, module_id, title, video_url, material_url, "order") values (
-     '00000000-0000-0000-0000-000000000003',
-     '00000000-0000-0000-0000-000000000002',
-     'Aula 1 - Introdução à Liderança',
-     'https://www.youtube.com/embed/dQw4w9WgXcQ',
-     'https://drive.google.com',
-     1
-   ) on conflict (id) do nothing;
-   ```
+5. Seed mínimo de conteúdo (programas para exibir no dashboard):
+   - Sem esse seed, **Meus Programas** e **Gestão de Programas** ficam vazios. Execute uma vez no SQL Editor ou:  
+     `supabase db execute --file supabase/seeds/seed_minimo.sql`  
+   - O arquivo está em `supabase/seeds/seed_minimo.sql` (programa + módulo + aula de exemplo).
 
 6. Subir o servidor de desenvolvimento:
    ```bash
