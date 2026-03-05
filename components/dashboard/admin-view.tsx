@@ -50,10 +50,15 @@ export function AdminView({ programs }: AdminViewProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Gestão de Programas</h1>
-        <Button onClick={() => setOpen(true)} className="gap-2">
-          <Plus className="size-4" />
-          Novo Programa
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/admin/users">Gerenciar Usuários</Link>
+          </Button>
+          <Button onClick={() => setOpen(true)} className="gap-2">
+            <Plus className="size-4" />
+            Novo Programa
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card text-card-foreground">

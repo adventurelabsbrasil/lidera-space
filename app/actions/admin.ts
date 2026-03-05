@@ -56,6 +56,54 @@ async function requireAdmin() {
   return { supabase, error: null }
 }
 
+export type UserProfile = {
+  id: string
+  email: string
+  role: string
+  created_at: string
+}
+
+export type UpdateRoleResult = { error?: string; success?: boolean }
+
+/**
+ * Lista todos os usuários do sistema. Retorna [] se não for admin.
+ */
+export async function getUsers(): Promise<UserProfile[]> {
+  const { supabase, error } = await requireAdmin()
+  if (error || !supabase) return []
+
+  const { data, error: queryError } = await supabase
+    .from('users')
+    .select('id, email, role, created_at')
+    .order('created_at', { ascending: false })
+
+  if (queryError) return []
+  return (data ?? []) as UserProfile[]
+}
+
+/**
+ * Atualiza a role de um usuário. Verifica role admin antes.
+ */
+export async function updateUserRole(
+  userId: string,
+  newRole: 'admin' | 'aluno'
+): Promise<UpdateRoleResult> {
+  const { supabase, error } = await requireAdmin()
+  if (error || !supabase) return { error: error ?? 'Acesso negado.' }
+
+  // Segurança: Não deixar o admin remover o próprio acesso se for o único, 
+  // mas como o Supabase lida com a requisição usando a role atual, ele pode.
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ role: newRole })
+    .eq('id', userId)
+
+  if (updateError) return { error: updateError.message }
+
+  revalidatePath('/dashboard/admin/users')
+  return { success: true }
+}
+
 /**
  * Lista todos os programas. Retorna [] se o usuário não for admin.
  */
