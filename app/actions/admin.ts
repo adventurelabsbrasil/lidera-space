@@ -44,7 +44,7 @@ async function requireAdmin() {
   if (!user) return { supabase: null, error: 'Não autenticado' }
 
   const { data: profile } = await supabase
-    .from('users')
+    .from('space_users')
     .select('role')
     .eq('id', user.id)
     .single()
@@ -73,7 +73,7 @@ export async function getUsers(): Promise<UserProfile[]> {
   if (error || !supabase) return []
 
   const { data, error: queryError } = await supabase
-    .from('users')
+    .from('space_users')
     .select('id, email, role, created_at')
     .order('created_at', { ascending: false })
 
@@ -94,7 +94,7 @@ export async function updateUserRole(
   // Segurança: Não deixar o admin remover o próprio acesso se for o único, 
   // mas como o Supabase lida com a requisição usando a role atual, ele pode.
   const { error: updateError } = await supabase
-    .from('users')
+    .from('space_users')
     .update({ role: newRole })
     .eq('id', userId)
 
@@ -112,7 +112,7 @@ export async function getPrograms(): Promise<Program[]> {
   if (error || !supabase) return []
 
   const { data, error: queryError } = await supabase
-    .from('programs')
+    .from('space_programs')
     .select('id, title, description, created_at, updated_at')
     .order('created_at', { ascending: false })
 
@@ -139,7 +139,7 @@ export async function createProgram(
     return { error: 'Título é obrigatório.' }
   }
 
-  const { error: insertError } = await supabase.from('programs').insert({
+  const { error: insertError } = await supabase.from('space_programs').insert({
     title,
     description: description || null,
   })
@@ -160,7 +160,7 @@ export async function getProgramById(id: string): Promise<Program | null> {
   if (error || !supabase) return null
 
   const { data, error: queryError } = await supabase
-    .from('programs')
+    .from('space_programs')
     .select('id, title, description, created_at, updated_at')
     .eq('id', id)
     .single()
@@ -177,7 +177,7 @@ export async function getModulesByProgram(programId: string): Promise<Module[]> 
   if (error || !supabase) return []
 
   const { data, error: queryError } = await supabase
-    .from('modules')
+    .from('space_modules')
     .select('id, program_id, title, order, created_at, updated_at')
     .eq('program_id', programId)
     .order('order', { ascending: true })
@@ -194,7 +194,7 @@ export async function getLessonsByModule(moduleId: string): Promise<Lesson[]> {
   if (error || !supabase) return []
 
   const { data, error: queryError } = await supabase
-    .from('lessons')
+    .from('space_lessons')
     .select('id, module_id, title, video_url, material_url, order, created_at, updated_at')
     .eq('module_id', moduleId)
     .order('order', { ascending: true })
@@ -220,7 +220,7 @@ export async function createModule(
     return { error: 'Programa e título são obrigatórios.' }
   }
 
-  const { error: insertError } = await supabase.from('modules').insert({
+  const { error: insertError } = await supabase.from('space_modules').insert({
     program_id: programId,
     title,
     order: 0,
@@ -252,7 +252,7 @@ export async function createLesson(
     return { error: 'Módulo e título são obrigatórios.' }
   }
 
-  const { error: insertError } = await supabase.from('lessons').insert({
+  const { error: insertError } = await supabase.from('space_lessons').insert({
     module_id: moduleId,
     title,
     video_url: video_url || null,

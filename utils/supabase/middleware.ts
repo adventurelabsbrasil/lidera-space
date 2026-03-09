@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   let role = 'aluno'
   if (user) {
     const { data: profile } = await supabase
-      .from('users')
+      .from('space_users')
       .select('role')
       .eq('id', user.id)
       .single()

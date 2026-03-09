@@ -60,7 +60,7 @@ export async function listStudentPrograms(): Promise<StudentProgramSummary[]> {
   const supabase = await createClient()
 
   const { data } = await supabase
-    .from('programs')
+    .from('space_programs')
     .select('id, title, description')
     .order('created_at', { ascending: false })
 
@@ -77,7 +77,7 @@ export async function getStudentProgram(
   if (!supabase || !userId) return null
 
   const { data } = await supabase
-    .from('programs')
+    .from('space_programs')
     .select('id, title, description')
     .eq('id', programId)
     .limit(1)
@@ -96,7 +96,7 @@ export async function getStudentProgramModules(
   if (!supabase || !userId) return []
 
   const { data: modules } = await supabase
-    .from('modules')
+    .from('space_modules')
     .select('id, program_id, title, order')
     .eq('program_id', programId)
     .order('order', { ascending: true })
@@ -107,7 +107,7 @@ export async function getStudentProgramModules(
 
   for (const module of modules as Module[]) {
     const { data: lessons } = await supabase
-      .from('lessons')
+      .from('space_lessons')
       .select('id, module_id, title, video_url, material_url, order')
       .eq('module_id', module.id)
       .order('order', { ascending: true })
@@ -129,7 +129,7 @@ export async function getLessonDetail(lessonId: string): Promise<LessonDetail | 
   if (!supabase || !userId) return null
 
   const { data: lessonRows } = await supabase
-    .from('lessons')
+    .from('space_lessons')
     .select('id, module_id, title, video_url, material_url, order')
     .eq('id', lessonId)
     .limit(1)
@@ -139,7 +139,7 @@ export async function getLessonDetail(lessonId: string): Promise<LessonDetail | 
   if (!lesson) return null
 
   const { data: noteRows } = await supabase
-    .from('notes')
+    .from('space_notes')
     .select('content')
     .eq('lesson_id', lessonId)
     .eq('user_id', userId)
@@ -148,7 +148,7 @@ export async function getLessonDetail(lessonId: string): Promise<LessonDetail | 
   const noteRow = noteRows?.[0] as { content: string } | undefined
 
   const { data: progressRows } = await supabase
-    .from('progress')
+    .from('space_progress')
     .select('completed')
     .eq('lesson_id', lessonId)
     .eq('user_id', userId)
@@ -182,7 +182,7 @@ export async function saveLessonNote(
     return { error: 'Aula inválida.' }
   }
 
-  const { error } = await supabase.from('notes').upsert(
+  const { error } = await supabase.from('space_notes').upsert(
     {
       user_id: userId,
       lesson_id: lessonId,
@@ -218,7 +218,7 @@ export async function toggleLessonProgress(
   }
 
   const { data: existingRows } = await supabase
-    .from('progress')
+    .from('space_progress')
     .select('id, completed')
     .eq('lesson_id', lessonId)
     .eq('user_id', userId)
@@ -227,7 +227,7 @@ export async function toggleLessonProgress(
   const existing = existingRows?.[0] as { id: string; completed: boolean } | undefined
 
   if (!existing) {
-    const { error } = await supabase.from('progress').insert({
+    const { error } = await supabase.from('space_progress').insert({
       user_id: userId,
       lesson_id: lessonId,
       completed: true,
@@ -238,7 +238,7 @@ export async function toggleLessonProgress(
     }
   } else {
     const { error } = await supabase
-      .from('progress')
+      .from('space_progress')
       .update({ completed: !existing.completed })
       .eq('id', existing.id)
 

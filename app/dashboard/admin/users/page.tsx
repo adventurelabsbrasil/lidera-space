@@ -16,7 +16,7 @@ export default async function UsersPage() {
 
   // Double check protection (mesmo que o middleware ja proteja)
   const { data: profile } = await supabase
-    .from('users')
+    .from('space_users')
     .select('role')
     .eq('id', user.id)
     .single()

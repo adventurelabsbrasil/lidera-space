@@ -1,9 +1,10 @@
 -- =============================================================================
--- Lidera Space — Seed mínimo (programa + módulo + aula)
--- Rode no SQL Editor do Supabase ou: supabase db execute --file supabase/seeds/seed_minimo.sql
+-- Space (Lidera) — Seed mínimo (programa + módulo + aula)
+-- Tabelas space_* (após migração 20260311100000_space_tables_prefix.sql).
+-- Rode no SQL Editor do Supabase do cliente ou: supabase db execute --file supabase/seeds/seed_minimo.sql
 -- =============================================================================
 
-INSERT INTO public.programs (id, title, description)
+INSERT INTO public.space_programs (id, title, description)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
   'Programa de Liderança',
@@ -11,7 +12,7 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.modules (id, program_id, title, "order")
+INSERT INTO public.space_modules (id, program_id, title, "order")
 VALUES (
   '00000000-0000-0000-0000-000000000002',
   '00000000-0000-0000-0000-000000000001',
@@ -20,7 +21,7 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.lessons (id, module_id, title, video_url, material_url, "order")
+INSERT INTO public.space_lessons (id, module_id, title, video_url, material_url, "order")
 VALUES (
   '00000000-0000-0000-0000-000000000003',
   '00000000-0000-0000-0000-000000000002',

@@ -10,18 +10,29 @@ Modelo: **SaaS B2B2C**, onde cada cliente possui seu próprio projeto Supabase (
 
 ---
 
+## Cenário de tabelas (qual usar)
+
+Este app pode rodar com **dois** cenários de banco:
+
+| Cenário | Tabelas | Quando usar |
+|--------|---------|-------------|
+| **Com prefixo `space_*`** | `space_users`, `space_programs`, `space_modules`, `space_lessons`, `space_notes`, `space_progress` | Projeto Supabase do cliente já teve a migração `20260311100000_space_tables_prefix.sql` aplicada (ex.: Lidera). **Este é o cenário atual do código.** |
+| **Sem prefixo** | `users`, `programs`, `modules`, `lessons`, `notes`, `progress` | Projeto exclusivo novo, sem a migração de prefixo; use `20260301195140_init_schema.sql` e altere no código os `from('space_*')` para os nomes sem prefixo. |
+
+O deploy em `lideraspace.adventurelabs.com.br` usa o **Supabase do Lidera** com tabelas `space_*`. As env `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` devem apontar para o projeto do cliente. Status e checklist do setup Lidera: [docs/SETUP_PROJETO_LIDERA.md](docs/SETUP_PROJETO_LIDERA.md).
+
+---
+
 ## Arquitetura de Domínio
 
 Hierarquia de conteúdo:
-- `programs` → Programas (ex.: Programa de Liderança)
-- `modules` → Módulos dentro de um programa
-- `lessons` → Aulas dentro de um módulo
-- `notes` → Anotações em texto por aula e por aluno
-- `progress` → Progresso (checkbox de conclusão) por aula e por aluno
+- `space_programs` (ou `programs`) → Programas (ex.: Programa de Liderança)
+- `space_modules` (ou `modules`) → Módulos dentro de um programa
+- `space_lessons` (ou `lessons`) → Aulas dentro de um módulo
+- `space_notes` (ou `notes`) → Anotações em texto por aula e por aluno
+- `space_progress` (ou `progress`) → Progresso (checkbox de conclusão) por aula e por aluno
 
-Tabelas definidas em `supabase/migrations/20260301195140_init_schema.sql`, com:
-- Trigger `handle_new_user` para popular `public.users` a partir de `auth.users`.
-- RLS ativado em todas as tabelas e políticas por `role` (`admin` x `aluno`) e `user_id`.
+Tabelas: schema inicial em `supabase/migrations/20260301195140_init_schema.sql`; schema com prefixo em `supabase/migrations/20260311100000_space_tables_prefix.sql`. Trigger popula a tabela de perfil (users ou space_users) a partir de `auth.users`. RLS ativado em todas as tabelas; políticas por `role` (`admin` x `aluno`) e `user_id`.
 
 ---
 
@@ -45,7 +56,7 @@ Tabelas definidas em `supabase/migrations/20260301195140_init_schema.sql`, com:
   - Usa `revalidatePath` para manter o cache do App Router em sincronia.
 - UI:
   - `app/dashboard/page.tsx`:
-    - Busca o perfil em `public.users` e decide entre visão **admin** ou **aluno**.
+    - Busca o perfil em `space_users` (ou `users`) e decide entre visão **admin** ou **aluno**.
     - Admin → `AdminView` (`components/dashboard/admin-view.tsx`), com:
       - Tabela de programas.
       - Dialog para criar novo programa (Server Action + `useActionState`).
@@ -92,10 +103,10 @@ Tabelas definidas em `supabase/migrations/20260301195140_init_schema.sql`, com:
 
 ## Visões do dashboard (admin x aluno)
 
-- **Gestão de Programas** — Aparece quando o usuário tem `role = 'admin'` em `public.users`. Mostra tabela de programas, botão "Novo Programa" e links para módulos/aulas. Dados vêm de `getPrograms()`.
+- **Gestão de Programas** — Aparece quando o usuário tem `role = 'admin'` na tabela de perfil (`space_users` ou `users`). Mostra tabela de programas, botão "Novo Programa" e links para módulos/aulas. Dados vêm de `getPrograms()`.
 - **Meus Programas** — Aparece quando o usuário tem `role = 'aluno'` (ou qualquer outro valor). Mostra cards dos programas disponíveis e links para `/dashboard/courses/[id]`. Dados vêm de `listStudentPrograms()`.
 
-Se uma conta que deveria ter acesso total vê "Meus Programas" vazio, verifique: (1) se `public.users.role = 'admin'` para esse usuário (ver passo 4 acima); (2) se o seed mínimo de conteúdo foi executado (passo 5); (3) se a migration de RLS `20260304120000_rls_authenticated_read.sql` foi aplicada, para leitura de programas por usuários autenticados.
+Se uma conta que deveria ter acesso total vê "Meus Programas" vazio, verifique: (1) se a tabela de perfil (`space_users` ou `users`) tem `role = 'admin'` para esse usuário (ver passo 4 acima); (2) se o seed mínimo de conteúdo foi executado (passo 5); (3) se as migrations de RLS foram aplicadas (init_schema + rls_authenticated_read, ou space_tables_prefix).
 
 ---
 
@@ -117,17 +128,18 @@ Pré‑requisitos:
    ```
 
 3. Garantir schema e RLS:
-   - Execute as migrations em `supabase/migrations/` no projeto Supabase (na ordem: `20260301195140_init_schema.sql`, depois `20260304120000_rls_authenticated_read.sql`), ou use `supabase db push` se estiver usando Supabase CLI.
+   - **Cenário com prefixo (recomendado para Lidera):** Execute `supabase/migrations/20260311100000_space_tables_prefix.sql` no SQL Editor do projeto Supabase do cliente. Ela cria/renomeia tabelas para `space_*` e aplica RLS.
+   - **Cenário sem prefixo:** Execute `20260301195140_init_schema.sql` e depois `20260304120000_rls_authenticated_read.sql` (e altere o código para usar tabelas sem prefixo).
 
 4. Criar usuários iniciais e definir admin (conta com acesso total):
-   - Crie usuários em `auth.users` pelo painel do Supabase (Authentication → Users). O trigger já insere em `public.users` com `role = 'aluno'`.
+   - Crie usuários em `auth.users` pelo painel do Supabase (Authentication → Users). O trigger insere na tabela de perfil (`space_users` ou `users`) com `role = 'aluno'`.
    - Para dar **acesso total** (painel de gestão de programas), promova um usuário a admin:
      - **Opção A — seed por e-mail:** Edite `supabase/seeds/seed_admin.sql`, substitua `admin@seu-dominio.com` pelo e-mail desejado e execute no SQL Editor ou:  
-       `supabase db execute --file supabase/seeds/seed_admin.sql`
-     - **Opção B — manual por ID:**  
-       `UPDATE public.users SET role = 'admin' WHERE id = 'UUID_DO_USUARIO';`  
-       ou por e-mail:  
-       `UPDATE public.users SET role = 'admin' WHERE email = 'admin@seu-dominio.com';`
+       `supabase db execute --file supabase/seeds/seed_admin.sql`  
+       (O seed usa `space_users` se você estiver no cenário com prefixo.)
+     - **Opção B — manual:**  
+       `UPDATE public.space_users SET role = 'admin' WHERE email = 'admin@seu-dominio.com';`  
+       (ou `public.users` se sem prefixo.)
 
 5. Seed mínimo de conteúdo (programas para exibir no dashboard):
    - Sem esse seed, **Meus Programas** e **Gestão de Programas** ficam vazios. Execute uma vez no SQL Editor ou:  
