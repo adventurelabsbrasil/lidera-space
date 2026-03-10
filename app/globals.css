@@ -124,3 +124,31 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* DRE Anual: impressão A4 paisagem */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+  body {
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Ocultar sidebar e elementos não essenciais na impressão */
+  aside,
+  nav[aria-label="Navegação"],
+  .print\:hidden {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  /* Remover fundos para economizar tinta */
+  .bg-slate-50,
+  .dark .bg-slate-950 {
+    background: white !important;
+  }
+}

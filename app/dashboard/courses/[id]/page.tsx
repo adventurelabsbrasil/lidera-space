@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ChevronRight, Circle } from 'lucide-react'
+import { Check, ChevronRight, Circle, Wrench } from 'lucide-react'
 import {
   getStudentProgram,
   getStudentProgramModules,
@@ -56,6 +56,26 @@ export default async function StudentProgramPage({ params }: PageProps) {
           Voltar para meus programas
         </Link>
       </div>
+
+      {program.title === 'Lucro e Liberdade' && (
+        <Link
+          href={`/dashboard/courses/${id}/ferramentas`}
+          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+            <Wrench className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-slate-900 dark:text-slate-100">
+              Minhas Ferramentas de Gestão
+            </p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Lançamentos, DRE mensal e anual para seu negócio
+            </p>
+          </div>
+          <ChevronRight className="size-5 shrink-0 text-slate-400" />
+        </Link>
+      )}
 
       {modulesWithLessons.length === 0 ? (
         <p className="rounded-lg border border-dashed py-8 text-center text-muted-foreground text-sm">

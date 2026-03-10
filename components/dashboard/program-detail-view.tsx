@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, GripVertical, Plus, Video, FileText } from 'lucide-react'
+import { ArrowLeft, GripVertical, Plus, Video, FileText, Wrench } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -291,6 +291,16 @@ export function ProgramDetailView({
 
       {program.description && (
         <p className="text-muted-foreground text-sm">{program.description}</p>
+      )}
+
+      {program.title === 'Lucro e Liberdade' && (
+        <Link
+          href={`/dashboard/courses/${program.id}/ferramentas`}
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+        >
+          <Wrench className="size-4" />
+          Ferramentas de Gestão
+        </Link>
       )}
 
       <DndContext
