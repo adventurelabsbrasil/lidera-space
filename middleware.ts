@@ -6,29 +6,31 @@ import { updateSession } from '@/utils/supabase/middleware'
  * Redireciona para /login se não autenticado ao acessar /dashboard.
  */
 export async function middleware(request: NextRequest) {
-  const { response, user, role } = await updateSession(request)
+  try {
+    const { response, user, role } = await updateSession(request)
 
-  const isDashboardRoute = request.nextUrl.pathname.startsWith('/dashboard')
-  const isAdminRoute = request.nextUrl.pathname.startsWith('/dashboard/programs/') && (
-    request.nextUrl.pathname.includes('/edit') || 
-    request.nextUrl.pathname.includes('/new')
-  )
+    const isDashboardRoute = request.nextUrl.pathname.startsWith('/dashboard')
+    const isAdminRoute =
+      request.nextUrl.pathname.startsWith('/dashboard/programs/') &&
+      (request.nextUrl.pathname.includes('/edit') ||
+        request.nextUrl.pathname.includes('/new'))
 
-  // 1. Bloqueia acesso ao dashboard se não logado
-  if (isDashboardRoute && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
+    if (isDashboardRoute && !user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+
+    if (isAdminRoute && role !== 'admin') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
+
+    return response
+  } catch {
+    return NextResponse.next({ request })
   }
-
-  // 2. Bloqueia acesso a rotas administrativas se for 'aluno'
-  if (isAdminRoute && role !== 'admin') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard' // Manda pro dashboard do aluno
-    return NextResponse.redirect(url)
-  }
-
-  return response
 }
 
 export const config = {
