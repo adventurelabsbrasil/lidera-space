@@ -27,15 +27,31 @@ type Lesson = {
 
 export type StudentProgramSummary = Program
 
+export type StudentProgramWithProgress = StudentProgramSummary & {
+  completedCount: number
+  totalCount: number
+}
+
+export type LessonWithCompleted = Lesson & { completed: boolean }
+
 export type StudentModuleWithLessons = {
   module: Module
-  lessons: Lesson[]
+  lessons: LessonWithCompleted[]
+}
+
+export type LessonBreadcrumb = {
+  id: string
+  title: string
 }
 
 export type LessonDetail = {
   lesson: Lesson
   note: string
   completed: boolean
+  program: LessonBreadcrumb | null
+  module: LessonBreadcrumb | null
+  prevLessonId: string | null
+  nextLessonId: string | null
 }
 
 export type SaveNoteResult = { error?: string; success?: boolean }
@@ -68,6 +84,69 @@ export async function listStudentPrograms(): Promise<StudentProgramSummary[]> {
 }
 
 /**
+ * Lista programas com contagem de progresso (aulas concluídas / total) para o aluno.
+ */
+export async function listStudentProgramsWithProgress(): Promise<
+  StudentProgramWithProgress[]
+> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data: programs } = await supabase
+    .from('space_programs')
+    .select('id, title, description')
+    .order('created_at', { ascending: false })
+  if (!programs?.length) return []
+
+  const programIds = programs.map((p) => p.id)
+  const { data: modules } = await supabase
+    .from('space_modules')
+    .select('id, program_id')
+    .in('program_id', programIds)
+  const moduleList = modules ?? []
+  const moduleIds = moduleList.map((m) => m.id)
+  const { data: lessons } = await supabase
+    .from('space_lessons')
+    .select('id, module_id')
+    .in('module_id', moduleIds)
+  const lessonList = lessons ?? []
+
+  const totalByProgram = new Map<string, number>()
+  for (const p of programs) {
+    const programModuleIds = new Set(
+      moduleList.filter((m) => m.program_id === p.id).map((m) => m.id)
+    )
+    const count = lessonList.filter((l) => programModuleIds.has(l.module_id)).length
+    totalByProgram.set(p.id, count)
+  }
+
+  const { data: progress } = await supabase
+    .from('space_progress')
+    .select('lesson_id')
+    .eq('user_id', user.id)
+    .eq('completed', true)
+  const completedLessonIds = new Set(progress?.map((p) => p.lesson_id) ?? [])
+  const completedByProgram = new Map<string, number>()
+  for (const p of programs) {
+    const programModuleIds = new Set(
+      moduleList.filter((m) => m.program_id === p.id).map((m) => m.id)
+    )
+    const programLessons = lessonList.filter((l) => programModuleIds.has(l.module_id))
+    const count = programLessons.filter((l) => completedLessonIds.has(l.id)).length
+    completedByProgram.set(p.id, count)
+  }
+
+  return (programs as StudentProgramSummary[]).map((p) => ({
+    ...p,
+    completedCount: completedByProgram.get(p.id) ?? 0,
+    totalCount: totalByProgram.get(p.id) ?? 0,
+  }))
+}
+
+/**
  * Busca um programa específico para o aluno.
  */
 export async function getStudentProgram(
@@ -87,7 +166,7 @@ export async function getStudentProgram(
 }
 
 /**
- * Busca módulos e aulas de um programa para o aluno.
+ * Busca módulos e aulas de um programa para o aluno, com status de conclusão por aula.
  */
 export async function getStudentProgramModules(
   programId: string
@@ -104,6 +183,7 @@ export async function getStudentProgramModules(
   if (!modules) return []
 
   const results: StudentModuleWithLessons[] = []
+  const allLessonIds: string[] = []
 
   for (const module of modules as Module[]) {
     const { data: lessons } = await supabase
@@ -112,10 +192,31 @@ export async function getStudentProgramModules(
       .eq('module_id', module.id)
       .order('order', { ascending: true })
 
+    const lessonList = (lessons ?? []) as Lesson[]
+    lessonList.forEach((l) => allLessonIds.push(l.id))
     results.push({
       module,
-      lessons: (lessons ?? []) as Lesson[],
+      lessons: lessonList.map((l) => ({ ...l, completed: false })),
     })
+  }
+
+  if (allLessonIds.length === 0) return results
+
+  const { data: progressRows } = await supabase
+    .from('space_progress')
+    .select('lesson_id')
+    .eq('user_id', userId)
+    .eq('completed', true)
+    .in('lesson_id', allLessonIds)
+  const completedSet = new Set(
+    (progressRows ?? []).map((r: { lesson_id: string }) => r.lesson_id)
+  )
+
+  for (const row of results) {
+    row.lessons = row.lessons.map((l) => ({
+      ...l,
+      completed: completedSet.has(l.id),
+    }))
   }
 
   return results
@@ -156,10 +257,49 @@ export async function getLessonDetail(lessonId: string): Promise<LessonDetail | 
 
   const progressRow = progressRows?.[0] as { completed: boolean } | undefined
 
+  const { data: moduleRow } = await supabase
+    .from('space_modules')
+    .select('id, title, program_id')
+    .eq('id', lesson.module_id)
+    .limit(1)
+    .single()
+
+  const module = moduleRow as { id: string; title: string; program_id: string } | null
+  let program: LessonBreadcrumb | null = null
+  if (module) {
+    const { data: programRow } = await supabase
+      .from('space_programs')
+      .select('id, title')
+      .eq('id', module.program_id)
+      .limit(1)
+      .single()
+    program = programRow
+      ? { id: (programRow as { id: string; title: string }).id, title: (programRow as { id: string; title: string }).title }
+      : null
+  }
+
+  const { data: moduleLessons } = await supabase
+    .from('space_lessons')
+    .select('id')
+    .eq('module_id', lesson.module_id)
+    .order('order', { ascending: true })
+  const orderedIds = (moduleLessons ?? []).map((r: { id: string }) => r.id)
+  const currentIndex = orderedIds.indexOf(lesson.id)
+  const prevLessonId =
+    currentIndex > 0 ? orderedIds[currentIndex - 1] ?? null : null
+  const nextLessonId =
+    currentIndex >= 0 && currentIndex < orderedIds.length - 1
+      ? orderedIds[currentIndex + 1] ?? null
+      : null
+
   return {
     lesson,
     note: noteRow?.content ?? '',
     completed: progressRow?.completed ?? false,
+    program: program ?? null,
+    module: module ? { id: module.id, title: module.title } : null,
+    prevLessonId,
+    nextLessonId,
   }
 }
 

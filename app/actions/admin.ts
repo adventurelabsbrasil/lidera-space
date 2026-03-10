@@ -220,10 +220,21 @@ export async function createModule(
     return { error: 'Programa e título são obrigatórios.' }
   }
 
+  const { data: maxOrderRows } = await supabase
+    .from('space_modules')
+    .select('order')
+    .eq('program_id', programId)
+    .order('order', { ascending: false })
+    .limit(1)
+  const nextOrder =
+    maxOrderRows?.length && typeof maxOrderRows[0]?.order === 'number'
+      ? (maxOrderRows[0] as { order: number }).order + 1
+      : 0
+
   const { error: insertError } = await supabase.from('space_modules').insert({
     program_id: programId,
     title,
-    order: 0,
+    order: nextOrder,
   })
 
   if (insertError) return { error: insertError.message }
@@ -252,12 +263,23 @@ export async function createLesson(
     return { error: 'Módulo e título são obrigatórios.' }
   }
 
+  const { data: maxOrderRows } = await supabase
+    .from('space_lessons')
+    .select('order')
+    .eq('module_id', moduleId)
+    .order('order', { ascending: false })
+    .limit(1)
+  const nextOrder =
+    maxOrderRows?.length && typeof maxOrderRows[0]?.order === 'number'
+      ? (maxOrderRows[0] as { order: number }).order + 1
+      : 0
+
   const { error: insertError } = await supabase.from('space_lessons').insert({
     module_id: moduleId,
     title,
     video_url: video_url || null,
     material_url: material_url || null,
-    order: 0,
+    order: nextOrder,
   })
 
   if (insertError) return { error: insertError.message }
@@ -265,5 +287,54 @@ export async function createLesson(
   if (programId) {
     revalidatePath(`/dashboard/programs/${programId}`)
   }
+  return { success: true }
+}
+
+export type UpdateOrderResult = { error?: string; success?: boolean }
+
+/**
+ * Reordena módulos de um programa. moduleIds deve ser a lista de IDs na nova ordem.
+ */
+export async function updateModuleOrder(
+  programId: string,
+  moduleIds: string[]
+): Promise<UpdateOrderResult> {
+  const { supabase, error } = await requireAdmin()
+  if (error || !supabase) return { error: error ?? 'Acesso negado.' }
+
+  for (let i = 0; i < moduleIds.length; i++) {
+    const { error: updateError } = await supabase
+      .from('space_modules')
+      .update({ order: i })
+      .eq('id', moduleIds[i])
+      .eq('program_id', programId)
+    if (updateError) return { error: updateError.message }
+  }
+
+  revalidatePath(`/dashboard/programs/${programId}`)
+  return { success: true }
+}
+
+/**
+ * Reordena aulas de um módulo. lessonIds deve ser a lista de IDs na nova ordem.
+ */
+export async function updateLessonOrder(
+  moduleId: string,
+  lessonIds: string[],
+  programId: string
+): Promise<UpdateOrderResult> {
+  const { supabase, error } = await requireAdmin()
+  if (error || !supabase) return { error: error ?? 'Acesso negado.' }
+
+  for (let i = 0; i < lessonIds.length; i++) {
+    const { error: updateError } = await supabase
+      .from('space_lessons')
+      .update({ order: i })
+      .eq('id', lessonIds[i])
+      .eq('module_id', moduleId)
+    if (updateError) return { error: updateError.message }
+  }
+
+  revalidatePath(`/dashboard/programs/${programId}`)
   return { success: true }
 }

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { getPrograms } from '@/app/actions/admin'
-import { listStudentPrograms } from '@/app/actions/student'
+import { listStudentProgramsWithProgress } from '@/app/actions/student'
 import { AdminView } from '@/components/dashboard/admin-view'
 
 export default async function DashboardPage() {
@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     return <AdminView programs={programs} />
   }
 
-  const studentPrograms = await listStudentPrograms()
+  const studentPrograms = await listStudentProgramsWithProgress()
 
   return (
     <div className="space-y-6">
@@ -51,13 +51,39 @@ export default async function DashboardPage() {
               key={program.id}
               className="group rounded-lg border bg-card p-4 text-card-foreground transition hover:border-primary/60 hover:shadow-sm"
             >
-              <Link href={`/dashboard/courses/${program.id}`} className="block space-y-2">
+              <Link
+                href={`/dashboard/courses/${program.id}`}
+                className="block space-y-2"
+              >
                 <h2 className="text-base font-semibold group-hover:text-primary">
                   {program.title}
                 </h2>
                 <p className="line-clamp-3 text-sm text-muted-foreground">
                   {program.description ?? 'Programa sem descrição cadastrada.'}
                 </p>
+                {program.totalCount > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {program.completedCount}/{program.totalCount} aulas
+                      </span>
+                      <span>
+                        {Math.round(
+                          (program.completedCount / program.totalCount) * 100
+                        )}
+                        %
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{
+                          width: `${(program.completedCount / program.totalCount) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </Link>
             </li>
           ))}

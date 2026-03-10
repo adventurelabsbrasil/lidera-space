@@ -1,7 +1,9 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { useFormStatus } from 'react-dom'
+import Link from 'next/link'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   saveLessonNote,
   toggleLessonProgress,
@@ -45,19 +47,48 @@ export function LessonView({ detail }: LessonViewProps) {
 
   const [completed, setCompleted] = useState(detail.completed)
 
-  const [_, wrappedProgressFormAction] = useActionState<
-    ToggleProgressResult | null,
-    FormData
-  >(async (prev, formData) => {
-    const result = await toggleLessonProgress(prev, formData)
-    if (!result.error) {
-      setCompleted((prevCompleted) => !prevCompleted)
+  useEffect(() => {
+    if (progressState?.success) {
+      setCompleted((prev) => !prev)
     }
-    return result
-  }, null)
+  }, [progressState?.success])
 
   return (
     <div className="space-y-6">
+      {(detail.program || detail.module) && (
+        <nav
+          aria-label="Navegação"
+          className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground"
+        >
+          <Link
+            href="/dashboard"
+            className="hover:text-foreground hover:underline"
+          >
+            Início
+          </Link>
+          {detail.program && (
+            <>
+              <ChevronRight className="size-4 shrink-0" aria-hidden />
+              <Link
+                href={`/dashboard/courses/${detail.program.id}`}
+                className="hover:text-foreground hover:underline"
+              >
+                {detail.program.title}
+              </Link>
+            </>
+          )}
+          {detail.module && (
+            <>
+              <ChevronRight className="size-4 shrink-0" aria-hidden />
+              <span className="text-foreground">{detail.module.title}</span>
+            </>
+          )}
+          <ChevronRight className="size-4 shrink-0" aria-hidden />
+          <span className="text-foreground font-medium">
+            {detail.lesson.title}
+          </span>
+        </nav>
+      )}
       <header className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Aula
@@ -98,7 +129,7 @@ export function LessonView({ detail }: LessonViewProps) {
           <div className="space-y-3 rounded-lg border bg-card p-4 text-card-foreground">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold">Progresso</h2>
-              <form action={wrappedProgressFormAction}>
+              <form action={progressFormAction}>
                 <input type="hidden" name="lessonId" value={detail.lesson.id} />
                 <ProgressSubmitButton />
               </form>
@@ -136,6 +167,40 @@ export function LessonView({ detail }: LessonViewProps) {
           </div>
         </section>
       </div>
+
+      {(detail.prevLessonId || detail.nextLessonId) && (
+        <nav
+          aria-label="Navegação entre aulas"
+          className="flex flex-wrap items-center justify-between gap-4 border-t pt-6"
+        >
+          {detail.prevLessonId ? (
+            <Button variant="outline" asChild>
+              <Link
+                href={`/dashboard/lessons/${detail.prevLessonId}`}
+                className="gap-2"
+              >
+                <ChevronLeft className="size-4" />
+                Aula anterior
+              </Link>
+            </Button>
+          ) : (
+            <span />
+          )}
+          {detail.nextLessonId ? (
+            <Button variant="outline" asChild>
+              <Link
+                href={`/dashboard/lessons/${detail.nextLessonId}`}
+                className="gap-2"
+              >
+                Próxima aula
+                <ChevronRight className="size-4" />
+              </Link>
+            </Button>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
     </div>
   )
 }

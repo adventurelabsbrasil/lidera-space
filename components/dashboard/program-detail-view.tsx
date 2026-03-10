@@ -3,10 +3,29 @@
 import { useActionState, useEffect, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Video, FileText } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, GripVertical, Plus, Video, FileText } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   createModule,
   createLesson,
+  updateModuleOrder,
+  updateLessonOrder,
   type Program,
   type Module,
   type Lesson,
@@ -41,6 +60,104 @@ type ProgramDetailViewProps = {
   modulesWithLessons: ModuleWithLessons[]
 }
 
+function SortableLessonRow({ lesson }: { lesson: Lesson; programId: string }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: lesson.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={
+        isDragging
+          ? 'opacity-50'
+          : 'flex items-center gap-2 rounded-md border bg-muted/30 transition'
+      }
+    >
+      <button
+        type="button"
+        className="cursor-grab touch-none p-2 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        aria-label="Arrastar para reordenar"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-4" />
+      </button>
+      <Link
+        href={`/dashboard/lessons/${lesson.id}`}
+        className="flex flex-1 items-center gap-2 px-2 py-2 text-sm transition hover:border-primary/60 hover:bg-accent"
+      >
+        {lesson.video_url ? (
+          <Video className="size-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <span className="size-4 shrink-0" />
+        )}
+        {lesson.material_url && (
+          <FileText className="size-4 shrink-0 text-muted-foreground" />
+        )}
+        <span className="font-medium">{lesson.title}</span>
+        <span className="ml-auto text-xs text-muted-foreground">Ver aula</span>
+      </Link>
+    </li>
+  )
+}
+
+function SortableModuleItem({
+  module,
+  children,
+}: {
+  module: Module
+  children: React.ReactNode
+  programId?: string
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: module.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className={isDragging ? 'opacity-50' : undefined}>
+      <AccordionItem value={module.id}>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="cursor-grab touch-none p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+            aria-label="Arrastar para reordenar módulo"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-4" />
+          </button>
+          <AccordionTrigger className="flex-1 hover:no-underline">
+            {module.title}
+          </AccordionTrigger>
+        </div>
+        <AccordionContent>{children}</AccordionContent>
+      </AccordionItem>
+    </div>
+  )
+}
+
 function ModuleSubmitButton() {
   const { pending } = useFormStatus()
   return (
@@ -61,8 +178,12 @@ function LessonSubmitButton() {
 
 export function ProgramDetailView({
   program,
-  modulesWithLessons,
+  modulesWithLessons: initialModulesWithLessons,
 }: ProgramDetailViewProps) {
+  const router = useRouter()
+  const [modulesWithLessons, setModulesWithLessons] = useState(
+    initialModulesWithLessons
+  )
   const [moduleDialogOpen, setModuleDialogOpen] = useState(false)
   const [lessonDialogOpen, setLessonDialogOpen] = useState(false)
   const [lessonModuleId, setLessonModuleId] = useState<string | null>(null)
@@ -76,20 +197,79 @@ export function ProgramDetailView({
     null
   )
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  )
+
   useEffect(() => {
-    if (moduleState?.success) setModuleDialogOpen(false)
-  }, [moduleState?.success])
+    setModulesWithLessons(initialModulesWithLessons)
+  }, [initialModulesWithLessons])
+
+  useEffect(() => {
+    if (moduleState?.success) {
+      setModuleDialogOpen(false)
+      router.refresh()
+    }
+  }, [moduleState?.success, router])
 
   useEffect(() => {
     if (lessonState?.success) {
       setLessonDialogOpen(false)
       setLessonModuleId(null)
+      router.refresh()
     }
-  }, [lessonState?.success])
+  }, [lessonState?.success, router])
 
   const openNewLessonDialog = (moduleId: string) => {
     setLessonModuleId(moduleId)
     setLessonDialogOpen(true)
+  }
+
+  const moduleIds = modulesWithLessons.map((m) => m.module.id)
+  const allLessonIds = modulesWithLessons.flatMap((m) => m.lessons.map((l) => l.id))
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const activeId = String(active.id)
+    const overId = String(over.id)
+
+    if (moduleIds.includes(activeId)) {
+      const oldIndex = moduleIds.indexOf(activeId)
+      const newIndex = moduleIds.indexOf(overId)
+      if (oldIndex === -1 || newIndex === -1) return
+      const reordered = arrayMove(modulesWithLessons, oldIndex, newIndex)
+      setModulesWithLessons(reordered)
+      const result = await updateModuleOrder(
+        program.id,
+        reordered.map((m) => m.module.id)
+      )
+      if (!result.error) router.refresh()
+      return
+    }
+
+    const moduleIndex = modulesWithLessons.findIndex((m) =>
+      m.lessons.some((l) => l.id === activeId)
+    )
+    if (moduleIndex === -1) return
+    const row = modulesWithLessons[moduleIndex]
+    if (!row.lessons.some((l) => l.id === overId)) return
+    const lessonIds = row.lessons.map((l) => l.id)
+    const oldIdx = lessonIds.indexOf(activeId)
+    const newIdx = lessonIds.indexOf(overId)
+    if (oldIdx === -1 || newIdx === -1) return
+    const newLessons = arrayMove(row.lessons, oldIdx, newIdx)
+    const updated = [...modulesWithLessons]
+    updated[moduleIndex] = { ...row, lessons: newLessons }
+    setModulesWithLessons(updated)
+    const result = await updateLessonOrder(
+      row.module.id,
+      newLessons.map((l) => l.id),
+      program.id
+    )
+    if (!result.error) router.refresh()
   }
 
   return (
@@ -113,48 +293,56 @@ export function ProgramDetailView({
         <p className="text-muted-foreground text-sm">{program.description}</p>
       )}
 
-      <Accordion type="multiple" className="w-full">
-        {modulesWithLessons.length === 0 ? (
-          <p className="rounded-lg border border-dashed py-8 text-center text-muted-foreground text-sm">
-            Nenhum módulo ainda. Clique em &quot;Novo Módulo&quot; para começar.
-          </p>
-        ) : (
-          modulesWithLessons.map(({ module, lessons }) => (
-            <AccordionItem key={module.id} value={module.id}>
-              <AccordionTrigger>{module.title}</AccordionTrigger>
-              <AccordionContent>
-                <ul className="space-y-2">
-                  {lessons.map((lesson) => (
-                    <li
-                      key={lesson.id}
-                      className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2 text-sm"
-                    >
-                      {lesson.video_url ? (
-                        <Video className="size-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <span className="size-4 shrink-0" />
-                      )}
-                      {lesson.material_url && (
-                        <FileText className="size-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className="font-medium">{lesson.title}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 gap-2"
-                  onClick={() => openNewLessonDialog(module.id)}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <Accordion type="multiple" className="w-full">
+          {modulesWithLessons.length === 0 ? (
+            <p className="rounded-lg border border-dashed py-8 text-center text-muted-foreground text-sm">
+              Nenhum módulo ainda. Clique em &quot;Novo Módulo&quot; para começar.
+            </p>
+          ) : (
+            <SortableContext
+              items={moduleIds}
+              strategy={verticalListSortingStrategy}
+            >
+              {modulesWithLessons.map(({ module, lessons }) => (
+                <SortableModuleItem
+                  key={module.id}
+                  module={module}
+                  programId={program.id}
                 >
-                  <Plus className="size-4" />
-                  Nova Aula
-                </Button>
-              </AccordionContent>
-            </AccordionItem>
-          ))
-        )}
-      </Accordion>
+                  <SortableContext
+                    items={lessons.map((l) => l.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <ul className="space-y-2">
+                      {lessons.map((lesson) => (
+                        <SortableLessonRow
+                          key={lesson.id}
+                          lesson={lesson}
+                          programId={program.id}
+                        />
+                      ))}
+                    </ul>
+                  </SortableContext>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 gap-2"
+                    onClick={() => openNewLessonDialog(module.id)}
+                  >
+                    <Plus className="size-4" />
+                    Nova Aula
+                  </Button>
+                </SortableModuleItem>
+              ))}
+            </SortableContext>
+          )}
+        </Accordion>
+      </DndContext>
 
       {/* Dialog Novo Módulo */}
       <Dialog open={moduleDialogOpen} onOpenChange={setModuleDialogOpen}>
