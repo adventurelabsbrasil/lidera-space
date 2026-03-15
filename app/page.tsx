@@ -2,10 +2,14 @@ import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 
 export default async function Home() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user: { id: string } | null = null
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    user = data?.user ?? null
+  } catch {
+    user = null
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-4 py-16 text-center dark:bg-zinc-950">
