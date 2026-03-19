@@ -18,7 +18,7 @@ Use este guia quando for configurar o app Space no **projeto Supabase do Lidera*
 
 1. **No projeto Adventure Labs (ftctmseyrqhckutpfdeq):**  
    Rode no SQL Editor o script de limpeza para remover as tabelas Space:
-   - `clients/01_lidera/lidera-space/supabase/scripts/rollback_space_from_adventure_project.sql`
+   - No monorepo: `apps/clientes/lidera/space/supabase/scripts/rollback_space_from_adventure_project.sql`
 
 2. **Depois** siga os passos abaixo no projeto **do Lidera** (xiqlaxjtngwecidyoxbs).
 
